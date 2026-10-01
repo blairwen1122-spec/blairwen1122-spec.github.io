@@ -27,7 +27,7 @@ The first major problem was that the LEDs could display the sequence, but none o
 ## Final Prototype:
 ![Final LED Memory Game Prototype](IMG_1113.JPG)
 
-Code:
+Code that ChatGPT helped me with:
 
 ```cpp
 // ==========================================
