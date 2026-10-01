@@ -10,6 +10,14 @@ We tested the motor movement and distance sensor separately before combining the
 
 We also learned that engineering affects the results significantly. If the basic wiring is incorrect then the code doesn’t run, and if the sensor is loose or still moving when it measures, the readings can become inaccurate and imprecise. Therefore, aligning the sensors, keeping track of motor movement and timing were all important parts of getting the scanner to work consistently. 
 
+## Final Prototype Demonstration
+
+Here is the 3D scanner working:
+
+<video width="700" controls>
+  <source src="img-5423_xHzhEUZ8 (1).mp4" type="video/mp4">
+</video>
+
 ## My Initial Code
 
 ```cpp
