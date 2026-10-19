@@ -1339,3 +1339,236 @@ requestAnimationFrame(gameLoop);
 
 
 I want to investigate how JavaScript, Python, and C++ differ in computational efficiency when executing the same algorithms. My goal is to distinguish between time complexity, which describes how an algorithm's operations scale with its input size, and execution time, which can vary depending on the language, compiler, or runtime environment. I plan to implement identical algorithms in all three languages, including linear search, binary search, and sorting, then test them with progressively larger datasets. In past experiences, I have noticed c++ to be the most efficient because it's typically compiled directly into machine code before execution. Python typically runs code through a virtual machine, while JavaScript often compiles code as the program is running. This way, c++ can avoid some runtime overhead, thus is particularly effective for larger chunks in code found in game development. Additionally, with the same outcome, I have noticed the c++ code to be the shortest and require less index especially when working with #include \<set> or #include \<vector>, which you can use vectorname.size() to get the amount of values inputted. Furthermore, since the same algorithm generally retains its time complexity regardless of the language, I am interested in understanding why execution times are still different. I want to look more closely at factors like memory capacity, data structures used, built-in functions, and how they influence performance. Another goal I have is modifying the visual design of my game. After looking at the code for Flappy Bird and Subway Surfers, I want to try to change their colors and visual elements like obstacle width to increase difficulty. I want to find the sections of JavaScript responsible for adjusting properties such as background-color, fillStyle, and strokeStyle.
+
+# Hex Color ID Reference Sheet:
+
+## Basic colors
+
+Red
+#FF0000
+
+Orange
+#FFA500
+
+Yellow
+#FFFF00
+
+Green
+#008000
+
+Blue
+#0000FF
+
+Purple
+#800080
+
+Pink
+#FFC0CB
+
+White
+#FFFFFF
+
+Black
+#000000
+
+Gray
+#808080
+
+
+# Subway Surfers in a Different Language?
+
+## JavaScript — C++
+
+**C++**
+
+```cpp
+// Metro Runner - C++ / raylib port of the JavaScript Canvas game.
+// Build (macOS with Homebrew raylib): c++ -std=c++17 metro_runner.cpp -o metro_runner $(pkg-config --cflags --libs raylib)
+// Build (Linux with raylib installed): g++ -std=c++17 metro_runner.cpp -o metro_runner $(pkg-config --cflags --libs raylib)
+#include "raylib.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <ctime>
+#include <string>
+#include <vector>
+
+
+
+constexpr int WIDTH = 720;
+constexpr int HEIGHT = 540;
+constexpr float LANES[3] = {210.0f, 360.0f, 510.0f};
+constexpr float PLAYER_Y = 427.0f;
+constexpr float GRAVITY = 1650.0f;
+constexpr float JUMP_VELOCITY = 650.0f;
+constexpr float PI2 = 6.28318530718f;
+
+
+
+enum class Mode { Ready, Playing, Paused, Over };
+enum class Kind { Train, Barrier, Sign, Coin };
+struct Obstacle { int lane; float depth; Kind type; bool checked = false; };
+struct Projection { float x, y, scale; };
+
+
+
+static Color Hex(unsigned rgb, unsigned char alpha = 255) {
+   return Color{static_cast<unsigned char>((rgb >> 16) & 255),
+                static_cast<unsigned char>((rgb >> 8) & 255),
+                static_cast<unsigned char>(rgb & 255), alpha};
+}
+static void Rect(float x, float y, float w, float h, Color c) { DrawRectangleRec({x,y,w,h}, c); }
+static void Line(float x1,float y1,float x2,float y2,Color c,float thick=3) {
+   DrawLineEx({x1,y1},{x2,y2},thick,c);
+}
+static void Ellipse(float x,float y,float rx,float ry,Color c) {
+   DrawEllipse(static_cast<int>(x),static_cast<int>(y),rx,ry,c);
+}
+static void CenterText(const std::string& s,int y,int size,Color c) {
+   DrawText(s.c_str(), (WIDTH-MeasureText(s.c_str(),size))/2, y,size,c);
+}
+
+
+
+class Game {
+public:
+   Mode mode = Mode::Ready;
+   int lane = 1, coins = 0, best = 0;
+   float visualX = LANES[1], jumpHeight = 0, verticalVelocity = 0, slideTime = 0;
+   float score = 0, distance = 0, spawnTimer = 0, worldSpeed = 210;
+   std::vector<Obstacle> obstacles;
+
+
+
+   void Reset() {
+       mode = Mode::Playing; lane = 1; visualX = LANES[1];
+       jumpHeight = verticalVelocity = slideTime = 0;
+       score = distance = 0; coins = 0; obstacles.clear();
+       spawnTimer = 0.8f; worldSpeed = 210;
+   }
+   void Move(int action) { // -1 left, 1 right, 2 jump, 3 slide, 4 pause
+       if (action == 4) {
+           if (mode == Mode::Playing) mode = Mode::Paused;
+           else if (mode == Mode::Paused) mode = Mode::Playing;
+           return;
+       }
+       if (mode != Mode::Playing) return;
+       if (action == -1) lane = std::max(0,lane-1);
+       if (action == 1) lane = std::min(2,lane+1);
+       if (action == 2 && jumpHeight == 0) {
+           verticalVelocity = JUMP_VELOCITY; slideTime = 0;
+       }
+       if (action == 3) {
+           slideTime = 0.7f;
+           if (jumpHeight > 0) verticalVelocity = -JUMP_VELOCITY;
+       }
+   }
+   void SpawnRow() {
+       int safeLane = GetRandomValue(0,2);
+       int hazardLanes[2], j=0;
+       for (int l=0;l<3;l++) if (l!=safeLane) hazardLanes[j++]=l;
+       int count = GetRandomValue(0,999)<400 ? 2 : 1;
+       for (int i=0;i<count;i++)
+           obstacles.push_back({hazardLanes[i],0.0f,static_cast<Kind>(GetRandomValue(0,2)),false});
+       for (int i=0;i<4;i++) obstacles.push_back({safeLane,-0.17f-i*0.12f,Kind::Coin,false});
+   }
+   Projection Project(const Obstacle& o) const {
+       float depth = std::max(0.0f,o.depth), p = depth*depth;
+       return {WIDTH/2.0f+(LANES[o.lane]-WIDTH/2.0f)*(0.18f+0.82f*p),
+               138.0f+p*(PLAYER_Y-138.0f), 0.18f+p*0.82f};
+   }
+   void EndGame() { mode = Mode::Over; best = std::max(best,static_cast<int>(score)); }
+   void Update(float dt) {
+       if (mode!=Mode::Playing) return;
+       distance += worldSpeed*dt;
+       worldSpeed = std::min(390.0f,210.0f+distance*0.012f);
+       score += dt*worldSpeed*0.06f;
+       visualX += (LANES[lane]-visualX)*std::min(1.0f,13.0f*dt);
+       if (jumpHeight>0 || verticalVelocity>0) {
+           jumpHeight += verticalVelocity*dt;
+           verticalVelocity -= GRAVITY*dt;
+           if (jumpHeight<=0) jumpHeight=verticalVelocity=0;
+```
+
+To compare the time complexity and efficiency of JavaScript and C++, I converted my Metro Runner game into C++ using ChatGPT and looked into how the two versions handle obstacles and drawing. I started off by comparing the code that updates each obstacle and checks whether it has reached the player.
+
+**JavaScript:**
+
+```javascript
+for (const object of obstacles) {
+  object.depth += dt * worldSpeed / 480;
+  if (!object.checked && object.depth >= 0.93) {
+    object.checked = true;
+    if (object.lane !== lane) continue;
+  }
+}
+```
+
+**C++:**
+
+```cpp
+for (auto& o : obstacles) {
+    o.depth += dt * worldSpeed / 480.0f;
+    if (!o.checked && o.depth >= 0.93f) {
+        o.checked = true;
+        if (o.lane != lane) continue;
+    }
+}
+```
+
+Both loops have a time complexity of O(n), in which n represents the number of obstacles. This is because the program goes through every obstacle once per frame. If the number of obstacles doubles, the amount of work in this loop doubles roughly too. Although the time complexity is the same, C++ runs the loop faster because of the way it stores information. In JavaScript, each obstacle is stored as an object inside an array, while C++ uses structs inside a std::vector. A vector keeps its elements next to each other in memory, so it's faster for the computer to access them when it's going through one after another, meaning that c++ can complete the same number of operations in less time.
+
+Then, I looked at the part of the code that sorts obstacles before drawing them.
+
+**JavaScript:**
+
+```javascript
+[...obstacles].sort((a,b) => a.depth-b.depth).forEach(drawObject);
+```
+
+**C++:**
+
+```cpp
+auto sorted = obstacles;
+
+std::sort(
+    sorted.begin(),
+    sorted.end(),
+    [](const Obstacle& a, const Obstacle& b) {
+        return a.depth < b.depth;
+    }
+);
+
+for (const auto& o : sorted) {
+    DrawObject(o);
+}
+```
+
+Both of these  versions sort obstacles by their depth so that objects farther away are drawn before objects closer to the player. Sorting takes O(n log n) time, making it the most costly part of the game through time complexity. Since the other main operations take O(n) or O(1), the overall time complexity of both games is O(n log n) per frame. Something I noticed is that both versions create a copy of the obstacles before sorting. In JavaScript, [...obstacles] creates a new array, and  auto sorted = obstacles in c++ copies the vector. This requires extra time and memory in both languages.
+
+The last part I looked at was how the game removes obstacles after they pass the player.
+
+**JavaScript:**
+
+```javascript
+obstacles = obstacles.filter(o => o.depth < 1.2);
+```
+
+**C++:**
+
+```cpp
+obstacles.erase(
+    std::remove_if(
+        obstacles.begin(),
+        obstacles.end(),
+        [](const Obstacle& o) {
+            return o.depth >= 1.2f;
+        }
+    ),
+    obstacles.end()
+);
+```
+
+Both versions have a time complexity of O(n) because the program has to go through each obstacle to check whether it should be removed. The difference is that JavaScript's filter() creates a new array with the remaining obstacles, while C++ removes them directly from the existing vector. Because C++ doesn't need to create a new collection every frame, it could save some time spent on processing and memory.
+
+Overall, converting Metro Runner from JavaScript to C++ didn't change its time complexity because I was still using the same algorithms. What changed was how each language stored and processed the information. C++ is compiled into machine code before the program runs, while JavaScript uses a browser engine that can compile and optimize the code as it runs. From comparing the code, I could see why C++ might be more efficient, especially when it comes to memory usage. However, I can't conclude that C++ is faster just from looking at the code, I would need a wider variety of codes to compare it more precisely.
